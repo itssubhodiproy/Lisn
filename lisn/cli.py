@@ -43,8 +43,11 @@ def setup(api_key: str):
 @main.command()
 def status():
     """Show current status and configuration."""
+    from lisn.process import get_status
+    
     config = Config.load()
     errors = config.validate()
+    daemon_status = get_status()
     
     click.echo(click.style("Lisn Status", bold=True))
     click.echo("─" * 30)
@@ -76,14 +79,20 @@ def status():
     else:
         click.echo(click.style("✓ Ready to use", fg="green"))
     
-    # Daemon status (placeholder)
+    # Daemon status
     click.echo()
-    click.echo("Daemon: " + click.style("Not running", fg="yellow"))
+    if daemon_status["running"]:
+        click.echo("Daemon: " + click.style(f"Running (PID {daemon_status['pid']})", fg="green"))
+    else:
+        click.echo("Daemon: " + click.style("Not running", fg="yellow"))
 
 
 @main.command()
-def start():
+@click.option("--foreground", "-f", is_flag=True, help="Run in foreground (don't daemonize)")
+def start(foreground: bool):
     """Start the dictation daemon."""
+    from lisn.process import start_daemon, is_running
+    
     config = Config.load()
     errors = config.validate()
     
@@ -93,18 +102,33 @@ def start():
             click.echo(f"  ⚠ {error}")
         raise SystemExit(1)
     
-    # Placeholder for daemon start
-    click.echo(click.style("Starting Lisn daemon...", fg="green"))
-    click.echo("(Daemon not yet implemented)")
+    if is_running():
+        click.echo(click.style("Lisn is already running", fg="yellow"))
+        click.echo("Use 'lisn stop' to stop, or 'lisn restart' to restart")
+        raise SystemExit(1)
+    
+    if foreground:
+        click.echo(click.style("Starting Lisn in foreground...", fg="green"))
+        click.echo("Press Ctrl+C to stop")
+        click.echo()
+    
+    start_daemon(foreground=foreground)
 
 
 @main.command()
 def stop():
     """Stop the dictation daemon."""
-    # Placeholder for daemon stop
-    click.echo(click.style("Stopping Lisn daemon...", fg="yellow"))
-    click.echo("(Daemon not yet implemented)")
+    from lisn.process import stop_daemon
+    stop_daemon()
+
+
+@main.command()
+def restart():
+    """Restart the dictation daemon."""
+    from lisn.process import restart_daemon
+    restart_daemon()
 
 
 if __name__ == "__main__":
     main()
+
