@@ -33,7 +33,7 @@ class HotkeyConfig:
 class ApiConfig:
     """Groq API settings."""
     api_key: str = ""
-    whisper_model: str = "whisper-large-v3"
+    whisper_model: str = "whisper-large-v3-turbo"
     llm_model: str = "llama-3.1-8b-instant"
 
 
@@ -83,7 +83,7 @@ class Config:
             ),
             api=ApiConfig(
                 api_key=api_data.get("api_key", ""),
-                whisper_model=api_data.get("whisper_model", "whisper-large-v3"),
+                whisper_model=api_data.get("whisper_model", "whisper-large-v3-turbo"),
                 llm_model=api_data.get("llm_model", "llama-3.1-8b-instant"),
             ),
         )
