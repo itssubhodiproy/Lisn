@@ -147,3 +147,80 @@ class GroqClient:
             return bool(self.api_key)
         except Exception:
             return False
+
+    def format_text(
+        self,
+        text: str,
+        llm_model: str = "llama-3.1-8b-instant",
+    ) -> str:
+        """
+        Format transcribed text with minimal grammar/punctuation fixes.
+        
+        Uses Groq's LLM via OpenAI-compatible API for light text cleanup.
+        Only fixes punctuation and capitalization - preserves original meaning.
+        
+        Args:
+            text: Raw transcribed text to format
+            llm_model: LLM model to use for formatting
+        
+        Returns:
+            Formatted text with punctuation fixes
+        
+        Raises:
+            GroqClientError: If formatting fails
+        """
+        if not text or not text.strip():
+            return text
+        
+        # Import here to avoid loading if not needed
+        import openai
+        
+        # Create OpenAI client pointing to Groq
+        llm_client = openai.OpenAI(
+            api_key=self.api_key,
+            base_url="https://api.groq.com/openai/v1",
+            timeout=self.timeout,
+        )
+        
+        # Minimal formatting prompt - just punctuation
+        system_prompt = """You are a text formatter. Your ONLY job is to add proper punctuation and capitalization to the input text.
+
+Rules:
+- Add periods, commas, question marks where appropriate
+- Capitalize the first letter of sentences
+- Capitalize proper nouns (names, places)
+- Do NOT change any words
+- Do NOT add or remove any words
+- Do NOT rephrase anything
+- Return ONLY the formatted text, nothing else"""
+
+        try:
+            response = llm_client.chat.completions.create(
+                model=llm_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text},
+                ],
+                temperature=0.0,  # Deterministic output
+                max_tokens=len(text) * 2,  # Should not exceed input length much
+            )
+            
+            formatted = response.choices[0].message.content
+            
+            # Validate response - should be similar length to input
+            if formatted and len(formatted) < len(text) * 3:
+                return formatted.strip()
+            else:
+                # Response seems wrong, return original
+                return text
+                
+        except openai.RateLimitError as e:
+            raise GroqClientError(f"Rate limited: {e}") from e
+        except openai.APIConnectionError as e:
+            raise GroqClientError(f"Connection error: {e}") from e
+        except openai.APIError as e:
+            raise GroqClientError(f"API error: {e}") from e
+        except Exception as e:
+            # On any error, return original text rather than failing
+            return text
+
