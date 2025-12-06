@@ -157,3 +157,106 @@ class AudioRecorder:
             }
         except Exception:
             return None
+
+
+def to_wav_bytes(audio_data: np.ndarray, sample_rate: int = 16000) -> bytes:
+    """
+    Convert numpy audio array to WAV bytes (16kHz mono, 16-bit PCM).
+    
+    This format is compatible with Groq Whisper API.
+    
+    Args:
+        audio_data: Audio as numpy float32 array (values in -1.0 to 1.0)
+        sample_rate: Sample rate in Hz (default 16000 for Whisper)
+    
+    Returns:
+        WAV file as bytes
+    """
+    import wave
+    
+    # Ensure mono
+    if audio_data.ndim > 1:
+        audio_data = audio_data.mean(axis=1)
+    
+    # Convert float32 (-1.0 to 1.0) to int16
+    audio_int16 = (audio_data * 32767).astype(np.int16)
+    
+    # Write to WAV bytes
+    buffer = io.BytesIO()
+    with wave.open(buffer, 'wb') as wav_file:
+        wav_file.setnchannels(1)  # Mono
+        wav_file.setsampwidth(2)  # 16-bit
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(audio_int16.tobytes())
+    
+    buffer.seek(0)
+    return buffer.read()
+
+
+def trim_silence(
+    audio_data: np.ndarray,
+    threshold: float = 0.01,
+    min_silence_duration: float = 0.1,
+    sample_rate: int = 16000,
+) -> np.ndarray:
+    """
+    Trim silence from the beginning and end of audio.
+    
+    Args:
+        audio_data: Audio as numpy array
+        threshold: Amplitude threshold below which is considered silence
+        min_silence_duration: Minimum duration of silence to trim (seconds)
+        sample_rate: Sample rate in Hz
+    
+    Returns:
+        Trimmed audio array
+    """
+    if len(audio_data) == 0:
+        return audio_data
+    
+    # Calculate energy per sample
+    abs_audio = np.abs(audio_data.flatten())
+    
+    # Find where audio exceeds threshold
+    above_threshold = abs_audio > threshold
+    
+    if not np.any(above_threshold):
+        # All silence - return empty or very short
+        return audio_data[:int(sample_rate * 0.1)]  # 100ms minimum
+    
+    # Find first and last non-silent sample
+    non_silent_indices = np.where(above_threshold)[0]
+    start_idx = max(0, non_silent_indices[0] - int(sample_rate * 0.05))  # 50ms padding
+    end_idx = min(len(audio_data), non_silent_indices[-1] + int(sample_rate * 0.05))
+    
+    return audio_data[start_idx:end_idx]
+
+
+def is_silent(
+    audio_data: np.ndarray,
+    threshold: float = 0.01,
+    min_speech_duration: float = 0.3,
+    sample_rate: int = 16000,
+) -> bool:
+    """
+    Check if audio is mostly silence (no meaningful speech).
+    
+    Args:
+        audio_data: Audio as numpy array
+        threshold: Amplitude threshold for detecting speech
+        min_speech_duration: Minimum duration of speech required (seconds)
+        sample_rate: Sample rate in Hz
+    
+    Returns:
+        True if audio is considered silent/empty
+    """
+    if len(audio_data) == 0:
+        return True
+    
+    # Count samples above threshold
+    above_threshold = np.abs(audio_data.flatten()) > threshold
+    speech_samples = np.sum(above_threshold)
+    speech_duration = speech_samples / sample_rate
+    
+    return speech_duration < min_speech_duration
+
