@@ -272,13 +272,15 @@ Push-to-talk voice dictation app using Groq Cloud (Whisper + LLM) for Linux desk
 **Goal**: One-command installation for users
 
 - Create install.sh script
-- Check system dependencies (Python, audio libs, GTK)
+- Check system dependencies (Python, audio libs)
 - Install text injection tools (xdotool for X11, ydotool for Wayland)
 - Set up /dev/uinput permissions (udev rule for ydotool)
 - Add user to input group for keyboard access
 - Enable ydotoold service on Wayland systems
 - Install Python package in user space
-- Run initial setup automatically
+- Run initial setup automatically (API key prompt)
+- Create systemd user service (~/.config/systemd/user/lisn.service)
+- Enable autostart on login (systemctl --user enable lisn)
 - Add uninstall script
 
 **Test**: Run install on fresh Ubuntu VM, verify all components work
