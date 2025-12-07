@@ -57,11 +57,10 @@ class HotkeyListener:
         """Convert trigger key string to pynput Key."""
         key_map = {
             "caps_lock": keyboard.Key.caps_lock,
-            "scroll_lock": keyboard.Key.scroll_lock,
-            "pause": keyboard.Key.pause,
-            "f12": keyboard.Key.f12,
-            "f11": keyboard.Key.f11,
-            "f10": keyboard.Key.f10,
+            "capslock": keyboard.Key.caps_lock,
+            "control": keyboard.Key.ctrl_l,
+            "ctrl": keyboard.Key.ctrl_l,
+            "space": keyboard.Key.space,
         }
         
         key = key_map.get(self.trigger_key.lower())

@@ -17,6 +17,7 @@ from lisn.audio import AudioRecorder, to_wav_bytes, is_silent, trim_silence
 from lisn.groq_client import GroqClient, GroqClientError
 from lisn.hotkey import HotkeyListener
 from lisn.injector import TextInjector, InjectorError
+from lisn.widget import RecordingWidget, WidgetState, WidgetThread
 
 
 class DaemonState(Enum):
@@ -45,6 +46,7 @@ class DaemonProcess:
     """
     
     config: Config = field(default_factory=Config.load)
+    show_widget: bool = True  # Show visual indicator
     on_state_change: Optional[Callable[[DaemonState], None]] = None
     on_transcription: Optional[Callable[[str], None]] = None
     
@@ -55,12 +57,28 @@ class DaemonProcess:
     _groq_client: Optional[GroqClient] = field(default=None, init=False)
     _injector: Optional[TextInjector] = field(default=None, init=False)
     _hotkey_listener: Optional[HotkeyListener] = field(default=None, init=False)
+    _widget: Optional[RecordingWidget] = field(default=None, init=False)
+    _widget_thread: Optional[WidgetThread] = field(default=None, init=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False)
     _stop_event: threading.Event = field(default_factory=threading.Event, init=False)
 
     def _set_state(self, state: DaemonState) -> None:
         """Update state and notify listeners."""
         self._state = state
+        
+        # Update widget
+        if self._widget:
+            state_map = {
+                DaemonState.IDLE: WidgetState.HIDDEN,
+                DaemonState.RECORDING: WidgetState.RECORDING,
+                DaemonState.PROCESSING: WidgetState.PROCESSING,
+                DaemonState.ERROR: WidgetState.ERROR,
+            }
+            try:
+                self._widget.set_state(state_map.get(state, WidgetState.HIDDEN))
+            except Exception:
+                pass
+        
         if self.on_state_change:
             try:
                 self.on_state_change(state)
@@ -188,6 +206,13 @@ class DaemonProcess:
         
         self._injector = TextInjector()
         
+        # Initialize widget for visual feedback (runs GTK in background thread)
+        if self.show_widget:
+            self._widget_thread = WidgetThread()
+            self._widget = self._widget_thread.start()
+            import time
+            time.sleep(0.2)  # Give GTK a moment to initialize
+        
         self._hotkey_listener = HotkeyListener(
             on_press=self._on_hotkey_press,
             on_release=self._on_hotkey_release,
@@ -223,6 +248,9 @@ class DaemonProcess:
         
         if self._recorder and self._recorder.is_recording:
             self._recorder.stop_recording()
+        
+        if self._widget_thread:
+            self._widget_thread.stop()
         
         self._set_state(DaemonState.IDLE)
         print("[Lisn] Stopped.")

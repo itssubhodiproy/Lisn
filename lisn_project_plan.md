@@ -194,8 +194,8 @@ Push-to-talk voice dictation app using Groq Cloud (Whisper + LLM) for Linux desk
 
 - Create widget.py module using GTK
 - Implement floating window (always on top, no decorations)
-- Show "Recording..." message near cursor
-- Add window positioning logic
+- Show "Recording..." message above focused window
+- Add window positioning logic using active window geometry
 - Handle multi-monitor setups
 
 **Test**: Show widget in various screen positions, verify always-on-top
@@ -272,7 +272,7 @@ Push-to-talk voice dictation app using Groq Cloud (Whisper + LLM) for Linux desk
 **Goal**: One-command installation for users
 
 - Create install.sh script
-- Check system dependencies (Python, audio libs)
+- Check system dependencies (Python, audio libs, GTK)
 - Install text injection tools (xdotool for X11, ydotool for Wayland)
 - Set up /dev/uinput permissions (udev rule for ydotool)
 - Add user to input group for keyboard access
@@ -340,6 +340,7 @@ Push-to-talk voice dictation app using Groq Cloud (Whisper + LLM) for Linux desk
 
 - Add "bring your own API key" support
 - Implement voice commands (new line, undo, etc.)
+- Add context-aware formatting (LinkedIn, Gmail, Terminal, etc.)
 - Add macOS support
 - Add Windows support
 - Create web distribution site
