@@ -133,9 +133,18 @@ class DaemonProcess:
             # Convert to WAV
             wav_bytes = to_wav_bytes(audio, sample_rate=self.config.audio.sample_rate)
             
-            # Transcribe
-            result = self._groq_client.transcribe_audio(wav_bytes)
-            text = result.text
+            # Transcribe with retry
+            text = None
+            for attempt in range(2):
+                try:
+                    result = self._groq_client.transcribe_audio(wav_bytes)
+                    text = result.text
+                    break
+                except GroqClientError as e:
+                    if attempt == 0 and "rate" in str(e).lower():
+                        time.sleep(0.5)  # Brief pause for rate limits
+                        continue
+                    raise
             
             if not text or not text.strip():
                 self._set_state(DaemonState.IDLE)
@@ -158,18 +167,37 @@ class DaemonProcess:
                 except Exception:
                     pass
             
-            # Inject text into focused window
+            # Inject text into focused window (add trailing space for next dictation)
             try:
-                self._injector.type_text(formatted_text)
+                self._injector.type_text(formatted_text + " ")
+                # Show success briefly
+                self._set_state(DaemonState.IDLE)
             except InjectorError as e:
-                print(f"[Lisn] Injection error: {e}")
+                self._show_error(f"Injection failed")
             
         except GroqClientError as e:
-            print(f"[Lisn] API error: {e}")
+            error_msg = str(e)
+            if "api_key" in error_msg.lower() or "auth" in error_msg.lower():
+                self._show_error("Invalid API key")
+            elif "rate" in error_msg.lower():
+                self._show_error("Rate limited")
+            elif "connect" in error_msg.lower() or "network" in error_msg.lower():
+                self._show_error("No internet")
+            else:
+                self._show_error("API error")
         except Exception as e:
-            print(f"[Lisn] Error: {e}")
+            self._show_error("Error")
         finally:
-            self._set_state(DaemonState.IDLE)
+            # Ensure we return to idle after error display
+            if self._state == DaemonState.ERROR:
+                time.sleep(1.5)  # Show error briefly
+                self._set_state(DaemonState.IDLE)
+
+    def _show_error(self, message: str) -> None:
+        """Show error in widget and set error state."""
+        self._set_state(DaemonState.ERROR)
+        if self._widget:
+            self._widget.update_message(f"❌ {message}")
 
     def _setup_signal_handlers(self) -> None:
         """Set up graceful shutdown on SIGINT/SIGTERM."""
