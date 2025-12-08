@@ -23,10 +23,6 @@ class AudioConfig:
     device: Optional[str] = None  # Default audio device
 
 
-@dataclass
-class HotkeyConfig:
-    """Hotkey settings."""
-    trigger: str = "caps_lock"  # Key to hold for recording
 
 
 @dataclass
@@ -41,7 +37,6 @@ class ApiConfig:
 class Config:
     """Main configuration for Lisn."""
     audio: AudioConfig = field(default_factory=AudioConfig)
-    hotkey: HotkeyConfig = field(default_factory=HotkeyConfig)
     api: ApiConfig = field(default_factory=ApiConfig)
 
     @classmethod
@@ -69,7 +64,6 @@ class Config:
     def _from_dict(cls, data: dict) -> "Config":
         """Create Config from dictionary."""
         audio_data = data.get("audio", {})
-        hotkey_data = data.get("hotkey", {})
         api_data = data.get("api", {})
 
         return cls(
@@ -77,9 +71,6 @@ class Config:
                 sample_rate=audio_data.get("sample_rate", 16000),
                 channels=audio_data.get("channels", 1),
                 device=audio_data.get("device"),
-            ),
-            hotkey=HotkeyConfig(
-                trigger=hotkey_data.get("trigger", "caps_lock"),
             ),
             api=ApiConfig(
                 api_key=api_data.get("api_key", ""),
@@ -97,9 +88,6 @@ class Config:
                 "sample_rate": self.audio.sample_rate,
                 "channels": self.audio.channels,
                 "device": self.audio.device,
-            },
-            "hotkey": {
-                "trigger": self.hotkey.trigger,
             },
             "api": {
                 "api_key": self.api.api_key,

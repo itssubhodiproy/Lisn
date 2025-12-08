@@ -257,7 +257,7 @@ class DaemonProcess:
         self._hotkey_listener.start()
         self._set_state(DaemonState.IDLE)
         
-        print(f"[Lisn] Ready! Hold {self.config.hotkey.trigger.upper()} to dictate.")
+        print("[Lisn] Ready! Hold CAPSLOCK to dictate.")
         
         # Block until stopped
         try:

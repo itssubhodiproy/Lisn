@@ -68,7 +68,7 @@ def status():
     
     # Audio settings
     click.echo(f"Audio: {config.audio.sample_rate}Hz, {config.audio.channels}ch")
-    click.echo(f"Hotkey: {config.hotkey.trigger}")
+    click.echo("Hotkey: CapsLock (fixed)")
     click.echo()
     
     # Validation
