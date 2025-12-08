@@ -15,7 +15,7 @@ from typing import Callable, Optional
 from lisn.config import Config
 from lisn.audio import AudioRecorder, to_wav_bytes, is_silent, trim_silence
 from lisn.groq_client import GroqClient, GroqClientError
-from lisn.hotkey import HotkeyListener
+from lisn.hotkey import HotkeyListener, HotkeyError
 from lisn.injector import TextInjector, InjectorError
 from lisn.widget import RecordingWidget, WidgetState, WidgetThread
 
@@ -174,6 +174,8 @@ class DaemonProcess:
     def _setup_signal_handlers(self) -> None:
         """Set up graceful shutdown on SIGINT/SIGTERM."""
         def handle_signal(signum, frame):
+            if not self._running:
+                return  # Already stopping
             print("\n[Lisn] Shutting down...")
             self.stop()
         
@@ -213,10 +215,10 @@ class DaemonProcess:
             import time
             time.sleep(0.2)  # Give GTK a moment to initialize
         
+        # Initialize hotkey listener (grabs CapsLock at hardware level)
         self._hotkey_listener = HotkeyListener(
             on_press=self._on_hotkey_press,
             on_release=self._on_hotkey_release,
-            trigger_key=self.config.hotkey.trigger,
         )
         
         # Set up signal handlers

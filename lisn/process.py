@@ -129,17 +129,17 @@ finally:
                 start_new_session=True,
             )
             
-            # Wait briefly and check if it started
+            # Wait for daemon to start and write PID file
             import time
-            time.sleep(0.5)
+            for _ in range(20):  # Wait up to 2 seconds
+                time.sleep(0.1)
+                if is_running():
+                    pid = get_pid()
+                    print(f"[Lisn] Started (PID {pid})")
+                    return True
             
-            if is_running():
-                pid = get_pid()
-                print(f"[Lisn] Started (PID {pid})")
-                return True
-            else:
-                print("[Lisn] Failed to start")
-                return False
+            print("[Lisn] Failed to start")
+            return False
                 
         except Exception as e:
             print(f"[Lisn] Failed to start: {e}")

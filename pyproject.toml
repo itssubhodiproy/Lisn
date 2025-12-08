@@ -28,7 +28,7 @@ dependencies = [
     "numpy>=1.24",
     "groq>=0.11",
     "openai>=1.0",
-    "pynput>=1.7",
+    "evdev>=1.6",
 ]
 
 # Note: GTK/PyGObject is a system dependency
