@@ -141,17 +141,18 @@ Push-to-talk voice dictation app using Groq Cloud (Whisper + LLM) for Linux desk
 ---
 
 #### Step 9: Text Injection
-**Goal**: Type transcribed text into focused window
+**Goal**: Insert transcribed text into focused window
 
 - Create injector.py module
-- Implement text typing using xdotool (X11)
-- Add ydotool support (Wayland) with fallback
-- Handle special characters and newlines
-- Add typing speed control
+- Implement clipboard-based paste injection
+- Save and restore user's original clipboard
+- Simulate Ctrl+V using pynput
+- Add fallback for apps that don't support paste
+- Handle both X11 and Wayland
 
-**Test**: Inject text into various apps (terminal, browser, text editor)
+**Test**: Inject text into various apps, verify clipboard is preserved
 
-**Commit**: "Implement cross-platform text injection"
+**Commit**: "Implement clipboard-based text injection"
 
 ---
 

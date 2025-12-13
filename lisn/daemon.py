@@ -124,9 +124,14 @@ class DaemonProcess:
             
             # Trim silence
             audio = trim_silence(audio, sample_rate=self.config.audio.sample_rate)
+
+            # DEBUG: Print volume
+            import numpy as np
+            print(f"DEBUG: Audio Max Volume: {np.max(np.abs(audio))}")
             
             # Check if mostly silent
             if is_silent(audio, sample_rate=self.config.audio.sample_rate):
+                print("DEBUG: Ignored as silence")
                 self._set_state(DaemonState.IDLE)
                 return
             
@@ -145,8 +150,9 @@ class DaemonProcess:
                         time.sleep(0.5)  # Brief pause for rate limits
                         continue
                     raise
-            
+            print(f"DEBUG: Raw Transcribed Text: '{text}'")
             if not text or not text.strip():
+                print("DEBUG: Text was empty, aborting.")
                 self._set_state(DaemonState.IDLE)
                 return
             
@@ -159,7 +165,8 @@ class DaemonProcess:
             except GroqClientError:
                 # On formatting error, use raw transcription
                 formatted_text = text
-            
+                
+            print(f"DEBUG: Injecting text: '{formatted_text}'")
             # Notify listeners
             if self.on_transcription:
                 try:
@@ -169,7 +176,7 @@ class DaemonProcess:
             
             # Inject text into focused window (add trailing space for next dictation)
             try:
-                self._injector.type_text(formatted_text + " ")
+                self._injector.inject_text(formatted_text + " ")
                 # Show success briefly
                 self._set_state(DaemonState.IDLE)
             except InjectorError as e:

@@ -1,8 +1,9 @@
 """
 Text injection module for Lisn.
 
-Types transcribed text into the currently focused window.
-Supports X11 (xdotool) and Wayland (ydotool).
+Injects transcribed text into the currently focused window using clipboard paste.
+Supports X11 and Wayland via pynput for Ctrl+V simulation.
+Falls back to xdotool/ydotool type commands if paste fails.
 """
 
 import shutil
@@ -11,6 +12,9 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+
+import pyperclip
+from pynput.keyboard import Controller, Key
 
 
 class InjectorError(Exception):
@@ -51,22 +55,24 @@ class TextInjector:
     """
     Injects text into the currently focused window.
     
-    Uses xdotool for X11 and ydotool for Wayland.
+    Primary method: clipboard paste (Ctrl+V) - fast and reliable.
+    Fallback: xdotool/ydotool type commands for apps that don't support paste.
     
     Usage:
         injector = TextInjector()
-        injector.type_text("Hello, world!")
+        injector.inject_text("Hello, world!")
     """
     
-    delay_ms: int = 0  # Delay between keystrokes (0 = fast)
+    delay_ms: int = 0  # Delay between keystrokes (for fallback typing)
     
     def __post_init__(self):
         """Initialize and detect available tools."""
         self._display_server = detect_display_server()
-        self._tool = self._detect_tool()
+        self._keyboard = Controller()
+        self._fallback_tool = self._detect_fallback_tool()
 
-    def _detect_tool(self) -> str:
-        """Detect which typing tool is available."""
+    def _detect_fallback_tool(self) -> Optional[str]:
+        """Detect which typing tool is available for fallback."""
         # For X11, prefer xdotool
         if self._display_server == DisplayServer.X11:
             if shutil.which("xdotool"):
@@ -80,21 +86,93 @@ class TextInjector:
         if shutil.which("xdotool"):
             return "xdotool"
         
-        raise InjectorError(
-            "No text injection tool found. Please install xdotool (for X11) "
-            "or ydotool (for Wayland):\n"
-            "  sudo apt install xdotool  # For X11\n"
-            "  sudo apt install ydotool  # For Wayland"
-        )
+        return None  # No fallback available
 
-    def _escape_text_xdotool(self, text: str) -> str:
-        """Escape special characters for xdotool."""
-        # xdotool's type command handles most characters
-        # but we need to be careful with shell escaping
-        return text
+    def _save_clipboard(self) -> Optional[str]:
+        """Save current clipboard contents."""
+        try:
+            return pyperclip.paste()
+        except Exception:
+            return None  # Clipboard might be empty or inaccessible
+
+    def _restore_clipboard(self, content: Optional[str]) -> None:
+        """Restore clipboard contents."""
+        if content is not None:
+            try:
+                pyperclip.copy(content)
+            except Exception:
+                pass  # Best effort restore
+
+    def _paste_with_keyboard(self) -> None:
+        """Simulate Ctrl+V to paste from clipboard."""
+        # Small delay to ensure clipboard is ready
+        time.sleep(0.02)
+        
+        if self._display_server == DisplayServer.WAYLAND:
+            # Wayland: pynput can't inject keystrokes, use ydotool
+            self._paste_with_ydotool()
+        else:
+            # X11: pynput works fine
+            self._keyboard.press(Key.ctrl)
+            self._keyboard.press('v')
+            self._keyboard.release('v')
+            self._keyboard.release(Key.ctrl)
+        
+        # Small delay after paste for reliability
+        time.sleep(0.05)
+
+    def _paste_with_ydotool(self) -> None:
+        """Simulate Ctrl+V using ydotool (for Wayland)."""
+        try:
+            # ydotool uses modifier+key format (e.g., ctrl+v)
+            subprocess.run(
+                ["ydotool", "key", "ctrl+v"],
+                capture_output=True,
+                timeout=5,
+            )
+        except Exception as e:
+            raise InjectorError(f"ydotool paste failed: {e}")
+
+    def inject_text(self, text: str, use_fallback: bool = True) -> None:
+        """
+        Inject text into the currently focused window using clipboard paste.
+        
+        Args:
+            text: Text to inject
+            use_fallback: If True, falls back to typing if paste fails
+        
+        Raises:
+            InjectorError: If injection fails and no fallback available
+        """
+        if not text:
+            return
+        
+        # Small delay to ensure focus is ready
+        time.sleep(0.05)
+        
+        # Save original clipboard
+        original_clipboard = self._save_clipboard()
+        
+        try:
+            # Copy text to clipboard
+            pyperclip.copy(text)
+            
+            # Paste with Ctrl+V
+            self._paste_with_keyboard()
+            
+        except Exception as e:
+            if use_fallback and self._fallback_tool:
+                # Fall back to type-based injection
+                self.type_text(text)
+            else:
+                raise InjectorError(f"Clipboard injection failed: {e}")
+        finally:
+            # Restore original clipboard (with small delay to ensure paste completed)
+            time.sleep(0.1)
+            self._restore_clipboard(original_clipboard)
 
     def _type_with_xdotool(self, text: str) -> None:
-        """Type text using xdotool."""
+        """Type text using xdotool (fallback)."""
         cmd = ["xdotool", "type", "--clearmodifiers"]
         
         if self.delay_ms > 0:
@@ -118,10 +196,9 @@ class TextInjector:
             raise InjectorError("xdotool not found")
 
     def _type_with_ydotool(self, text: str) -> None:
-        """Type text using ydotool."""
+        """Type text using ydotool (fallback)."""
         cmd = ["ydotool", "type", "--"]
         
-        # ydotool has different delay syntax
         if self.delay_ms > 0:
             cmd.insert(2, f"--key-delay={self.delay_ms}")
         
@@ -136,7 +213,6 @@ class TextInjector:
             )
             if result.returncode != 0:
                 stderr = result.stderr.lower()
-                # Check for common ydotool issues
                 if "uinput" in stderr or "permission" in stderr:
                     raise InjectorError(
                         "ydotool cannot access /dev/uinput. Fix with:\n"
@@ -159,7 +235,10 @@ class TextInjector:
 
     def type_text(self, text: str) -> None:
         """
-        Type text into the currently focused window.
+        Type text character-by-character (fallback method).
+        
+        Uses xdotool for X11 and ydotool for Wayland.
+        Slower than clipboard paste but works in more apps.
         
         Args:
             text: Text to type
@@ -170,15 +249,20 @@ class TextInjector:
         if not text:
             return
         
-        # Small delay to ensure focus is ready
+        if not self._fallback_tool:
+            raise InjectorError(
+                "No text injection tool found. Please install xdotool (for X11) "
+                "or ydotool (for Wayland):\n"
+                "  sudo apt install xdotool  # For X11\n"
+                "  sudo apt install ydotool  # For Wayland"
+            )
+        
         time.sleep(0.05)
         
-        if self._tool == "xdotool":
+        if self._fallback_tool == "xdotool":
             self._type_with_xdotool(text)
-        elif self._tool == "ydotool":
+        elif self._fallback_tool == "ydotool":
             self._type_with_ydotool(text)
-        else:
-            raise InjectorError(f"Unknown tool: {self._tool}")
 
     def type_key(self, key: str) -> None:
         """
@@ -187,11 +271,12 @@ class TextInjector:
         Args:
             key: Key name (e.g., "Return", "Tab", "space")
         """
-        if self._tool == "xdotool":
+        if self._fallback_tool == "xdotool":
             cmd = ["xdotool", "key", "--clearmodifiers", key]
-        else:
-            # ydotool uses different key names
+        elif self._fallback_tool == "ydotool":
             cmd = ["ydotool", "key", key]
+        else:
+            return  # No tool available
         
         try:
             subprocess.run(cmd, capture_output=True, timeout=5)
@@ -205,10 +290,11 @@ class TextInjector:
 
     @property
     def tool_name(self) -> str:
-        """Get the name of the tool being used."""
-        return self._tool
+        """Get the name of the fallback tool being used."""
+        return self._fallback_tool or "clipboard"
 
     @staticmethod
     def is_available() -> bool:
-        """Check if any text injection tool is available."""
-        return bool(shutil.which("xdotool") or shutil.which("ydotool"))
+        """Check if text injection is available (clipboard always works)."""
+        return True
+

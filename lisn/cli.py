@@ -6,6 +6,7 @@ Commands:
   lisn status  - Show current status and configuration
   lisn start   - Start the dictation daemon
   lisn stop    - Stop the dictation daemon
+  lisn service - Manage systemd service for auto-start
 """
 
 import click
@@ -127,6 +128,76 @@ def restart():
     """Restart the dictation daemon."""
     from lisn.process import restart_daemon
     restart_daemon()
+
+
+# ============================================================================
+# Service commands (systemd integration)
+# ============================================================================
+
+@main.group()
+def service():
+    """Manage systemd service for auto-start on login."""
+    pass
+
+
+@service.command("enable")
+def service_enable():
+    """Install and enable Lisn to auto-start on login."""
+    from lisn.service import enable_service, get_service_path
+    
+    click.echo("Installing systemd user service...")
+    
+    if enable_service():
+        click.echo(click.style("✓ ", fg="green") + "Service enabled!")
+        click.echo(f"  Service file: {get_service_path()}")
+        click.echo()
+        click.echo("Lisn will now start automatically when you log in.")
+        click.echo("To disable: " + click.style("lisn service disable", bold=True))
+    else:
+        click.echo(click.style("✗ Failed to enable service", fg="red"))
+        raise SystemExit(1)
+
+
+@service.command("disable")
+def service_disable():
+    """Disable auto-start on login."""
+    from lisn.service import disable_service
+    
+    if disable_service():
+        click.echo(click.style("✓ ", fg="green") + "Service disabled!")
+        click.echo("Lisn will no longer start automatically on login.")
+    else:
+        click.echo(click.style("✗ Failed to disable service", fg="red"))
+        raise SystemExit(1)
+
+
+@service.command("status")
+def service_status():
+    """Show systemd service status."""
+    from lisn.service import get_service_status, get_service_path
+    
+    status = get_service_status()
+    
+    click.echo(click.style("Systemd Service Status", bold=True))
+    click.echo("─" * 30)
+    click.echo(f"Service file: {get_service_path()}")
+    
+    if status["installed"]:
+        click.echo("Installed: " + click.style("Yes", fg="green"))
+        
+        if status["enabled"]:
+            click.echo("Enabled: " + click.style("Yes (starts on login)", fg="green"))
+        else:
+            click.echo("Enabled: " + click.style("No", fg="yellow"))
+        
+        if status["active"]:
+            click.echo("Active: " + click.style(status["status_text"], fg="green"))
+        else:
+            click.echo("Active: " + click.style(status["status_text"], fg="yellow"))
+    else:
+        click.echo("Installed: " + click.style("No", fg="yellow"))
+        click.echo()
+        click.echo("To enable auto-start: " + click.style("lisn service enable", bold=True))
 
 
 if __name__ == "__main__":
