@@ -175,7 +175,7 @@ echo ""
 
 # Step 9: Enable systemd service
 echo_step "Enabling auto-start service..."
-"$LISN_BIN" service enable
+"$LISN_BIN" start
 
 # ============================================================================
 # Final Output
