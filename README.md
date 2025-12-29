@@ -12,6 +12,10 @@ Lisn is a minimal voice dictation app that uses Groq Cloud (Whisper + LLM) to tr
 - 🎯 **Minimal UI** - Floating widget shows recording status
 - 🐧 **Linux-first** - Built for Ubuntu 24.04+
 
+## Demo
+
+https://github.com/itssubhodiproy/Lisn/raw/main/demo/Demo.mp4
+
 ## Requirements
 
 - Python 3.10+
