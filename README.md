@@ -4,6 +4,9 @@
 
 Lisn is a minimal voice dictation app that uses Groq Cloud (Whisper + LLM) to transcribe your speech and type it into any focused window. Hold CapsLock to record, release to transcribe.
 
+## Demo
+https://github.com/user-attachments/assets/f31da510-fd53-4f3d-95e7-18efdcaf2ac0
+
 ## Features
 
 - 🎤 **Push-to-talk** - Hold CapsLock to record, release to transcribe
@@ -11,10 +14,6 @@ Lisn is a minimal voice dictation app that uses Groq Cloud (Whisper + LLM) to tr
 - 🔧 **Works everywhere** - Types text into any focused application
 - 🎯 **Minimal UI** - Floating widget shows recording status
 - 🐧 **Linux-first** - Built for Ubuntu 24.04+
-
-## Demo
-
-https://github.com/itssubhodiproy/Lisn/raw/main/demo/Demo.mp4
 
 ## Requirements
 
