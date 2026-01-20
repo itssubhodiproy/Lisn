@@ -82,6 +82,9 @@ def start_daemon(foreground: bool = False) -> bool:
     
     if foreground:
         # Run in foreground
+        # Force GTK to use X11 backend on Wayland for reliable keyboard simulation
+        if os.environ.get("XDG_SESSION_TYPE") == "wayland":
+            os.environ["GDK_BACKEND"] = "x11"
         _write_pid_file(os.getpid())
         try:
             from lisn.daemon import DaemonProcess
@@ -119,14 +122,23 @@ try:
 finally:
     _remove_pid_file()
 """]
-            
-            # Start detached process
+
+            # Preserve critical environment variables for Wayland/X11 access
+            env = os.environ.copy()
+
+            # Force GTK to use X11 backend on Wayland for reliable keyboard simulation
+            # Native Wayland GTK has issues with focus handling for text injection
+            if os.environ.get("XDG_SESSION_TYPE") == "wayland":
+                env["GDK_BACKEND"] = "x11"
+
+            # Start detached process with inherited environment
             subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
                 start_new_session=True,
+                env=env,
             )
             
             # Wait for daemon to start and write PID file

@@ -105,26 +105,21 @@ class TextInjector:
 
     def _paste_with_keyboard(self) -> None:
         """Simulate Ctrl+V to paste from clipboard."""
-        # Small delay to ensure clipboard is ready
         time.sleep(0.02)
-        
+
         if self._display_server == DisplayServer.WAYLAND:
-            # Wayland: pynput can't inject keystrokes, use ydotool
             self._paste_with_ydotool()
         else:
-            # X11: pynput works fine
             self._keyboard.press(Key.ctrl)
             self._keyboard.press('v')
             self._keyboard.release('v')
             self._keyboard.release(Key.ctrl)
-        
-        # Small delay after paste for reliability
+
         time.sleep(0.05)
 
     def _paste_with_ydotool(self) -> None:
         """Simulate Ctrl+V using ydotool (for Wayland)."""
         try:
-            # ydotool uses modifier+key format (e.g., ctrl+v)
             subprocess.run(
                 ["ydotool", "key", "ctrl+v"],
                 capture_output=True,
@@ -146,8 +141,7 @@ class TextInjector:
         """
         if not text:
             return
-        
-        # Small delay to ensure focus is ready
+
         time.sleep(0.05)
         
         # Save original clipboard
