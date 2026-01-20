@@ -42,17 +42,49 @@ echo -e "${BOLD}╔════════════════════�
 echo -e "${BOLD}║      Lisn Voice Dictation Uninstaller  ║${NC}"
 echo -e "${BOLD}╚════════════════════════════════════════╝${NC}"
 
+# Step 0: Stop running lisn daemon
+echo_step "Stopping running Lisn daemon..."
+
+if [[ -L "$LOCAL_BIN/lisn" ]] && command -v "$LOCAL_BIN/lisn" &> /dev/null; then
+    "$LOCAL_BIN/lisn" stop 2>/dev/null || true
+    echo_ok "Lisn daemon stopped"
+elif [[ -f "$PID_DIR/lisn.pid" ]]; then
+    PID=$(cat "$PID_DIR/lisn.pid" 2>/dev/null)
+    if [[ -n "$PID" ]] && kill -0 "$PID" 2>/dev/null; then
+        kill "$PID" 2>/dev/null || true
+        echo_ok "Lisn daemon stopped (PID $PID)"
+    fi
+else
+    echo_ok "No running daemon found"
+fi
+
 # Step 1: Stop and disable systemd service
-echo_step "Stopping systemd service..."
+echo_step "Stopping Lisn systemd service..."
 
 if [[ -f "$SERVICE_FILE" ]]; then
     systemctl --user stop lisn 2>/dev/null || true
     systemctl --user disable lisn 2>/dev/null || true
     rm -f "$SERVICE_FILE"
     systemctl --user daemon-reload
-    echo_ok "Service stopped and removed"
+    echo_ok "Lisn service stopped and removed"
 else
-    echo_ok "Service not installed"
+    echo_ok "Lisn service not installed"
+fi
+
+# Step 1b: Handle ydotoold user service
+YDOTOOL_SERVICE="$HOME/.config/systemd/user/ydotoold.service"
+if [[ -f "$YDOTOOL_SERVICE" ]]; then
+    read -p "Stop and remove ydotoold user service? (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        systemctl --user stop ydotoold 2>/dev/null || true
+        systemctl --user disable ydotoold 2>/dev/null || true
+        rm -f "$YDOTOOL_SERVICE"
+        systemctl --user daemon-reload
+        echo_ok "ydotoold user service removed"
+    else
+        echo_ok "ydotoold user service kept"
+    fi
 fi
 
 # Step 2: Remove symlink

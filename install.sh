@@ -106,7 +106,7 @@ echo_step "Detecting display server..."
 
 if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
     echo_ok "Wayland session detected"
-    
+
     # Setup udev rule for /dev/uinput
     UDEV_RULE="/etc/udev/rules.d/80-uinput.rules"
     if [[ ! -f "$UDEV_RULE" ]]; then
@@ -118,13 +118,47 @@ if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
     else
         echo_ok "uinput rule already exists"
     fi
-    
-    # Enable ydotoold service
+
+    # Disable system-level ydotoold if running (we need user-level for proper permissions)
     if systemctl is-active --quiet ydotoold 2>/dev/null; then
-        echo_ok "ydotoold service already running"
+        echo "  Stopping system-level ydotoold (will use user-level instead)..."
+        sudo systemctl stop ydotoold 2>/dev/null || true
+        sudo systemctl disable ydotoold 2>/dev/null || true
+    fi
+
+    # Setup user-level ydotoold service (required for proper socket permissions)
+    YDOTOOL_SERVICE_DIR="$HOME/.config/systemd/user"
+    YDOTOOL_SERVICE_FILE="$YDOTOOL_SERVICE_DIR/ydotoold.service"
+
+    mkdir -p "$YDOTOOL_SERVICE_DIR"
+
+    if [[ ! -f "$YDOTOOL_SERVICE_FILE" ]]; then
+        echo "  Creating user-level ydotoold service..."
+        cat > "$YDOTOOL_SERVICE_FILE" << 'EOF'
+[Unit]
+Description=ydotool daemon (user)
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/ydotoold
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target
+EOF
+        echo_ok "ydotoold user service created"
+    fi
+
+    # Enable and start user-level ydotoold
+    systemctl --user daemon-reload
+    if ! systemctl --user is-active --quiet ydotoold 2>/dev/null; then
+        echo "  Enabling user-level ydotoold service..."
+        systemctl --user enable ydotoold 2>/dev/null || true
+        systemctl --user start ydotoold 2>/dev/null || echo_warn "ydotoold service may need logout/login to work"
+        echo_ok "ydotoold user service enabled"
     else
-        echo "  Enabling ydotoold service..."
-        sudo systemctl enable --now ydotoold 2>/dev/null || echo_warn "ydotoold service not available (may need reboot)"
+        echo_ok "ydotoold user service already running"
     fi
 else
     echo_ok "X11 session detected (or session type unknown)"
@@ -173,9 +207,9 @@ echo_step "Configuring Lisn..."
 echo ""
 "$LISN_BIN" setup
 
-# Step 9: Enable systemd service
+# Step 9: Enable systemd service for auto-start on login
 echo_step "Enabling auto-start service..."
-"$LISN_BIN" start
+"$LISN_BIN" service enable
 
 # ============================================================================
 # Final Output
@@ -186,10 +220,13 @@ echo -e "${GREEN}${BOLD}══════════════════�
 echo -e "${GREEN}${BOLD}   Lisn installation complete! 🎉${NC}"
 echo -e "${GREEN}${BOLD}════════════════════════════════════════${NC}"
 echo ""
-echo "Usage:"
-echo "  lisn start       - Start dictation daemon"
-echo "  lisn stop        - Stop daemon"
-echo "  lisn status      - Check status"
+echo "Lisn will auto-start on login."
+echo ""
+echo "Commands:"
+echo "  lisn start           - Start dictation daemon"
+echo "  lisn stop            - Stop daemon"
+echo "  lisn status          - Check status"
+echo "  lisn service disable - Disable auto-start"
 echo ""
 
 if [[ "$NEEDS_LOGOUT" == true ]]; then

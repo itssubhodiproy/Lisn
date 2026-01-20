@@ -39,7 +39,9 @@ def _get_lisn_executable() -> str:
 def _get_service_content() -> str:
     """Generate the systemd unit file content."""
     lisn_path = _get_lisn_executable()
-    
+
+    # Import DISPLAY and XAUTHORITY from the graphical session
+    # These are needed for pynput/X11 keyboard access
     return f"""[Unit]
 Description=Lisn Voice Dictation
 After=graphical-session.target network.target sound.target
@@ -51,7 +53,7 @@ ExecStart={lisn_path} start --foreground
 Restart=on-failure
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
-Environment=DISPLAY=:0
+PassEnvironment=DISPLAY XAUTHORITY WAYLAND_DISPLAY XDG_RUNTIME_DIR
 
 [Install]
 WantedBy=graphical-session.target
@@ -100,14 +102,14 @@ def install_service() -> bool:
 def enable_service() -> bool:
     """
     Enable the service to start on login.
-    
+
     Returns:
         True if successful, False otherwise
     """
-    if not is_service_installed():
-        if not install_service():
-            return False
-    
+    # Always reinstall to pick up any changes
+    if not install_service():
+        return False
+
     try:
         # Enable the service
         result = subprocess.run(
